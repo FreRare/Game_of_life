@@ -14,24 +14,6 @@ class World(object):
         }
         self.size = size
 
-    def get_context(self, x: int, y: int):
-        cells = {}
-        coordinates = [
-            (x + 1, y + 1),
-            (x - 1, y + 1),
-            (x + 1, y - 1),
-            (x - 1, y - 1),
-
-            (x + 0, y - 1),
-            (x + 1, y + 0),
-            (x + 0, y + 1),
-            (x - 1, y + 0),
-        ]
-        for coordinate in coordinates:
-            if coordinate in self.cells:
-                cells[coordinate] = self.cells[coordinate]
-        return Context(cells)
-
     def __str__(self):
         cell_list: List[List[Optional[Cell]]] = []
         for x in range(self.size):
@@ -49,6 +31,24 @@ class World(object):
                     text += "."
             text += "\n"
         return text
+
+    def get_context(self, x: int, y: int):
+        cells = {}
+        coordinates = [
+            (x + 1, y + 1),
+            (x - 1, y + 1),
+            (x + 1, y - 1),
+            (x - 1, y - 1),
+
+            (x + 0, y - 1),
+            (x + 1, y + 0),
+            (x + 0, y + 1),
+            (x - 1, y + 0),
+        ]
+        for coordinate in coordinates:
+            if coordinate in self.cells:
+                cells[coordinate] = self.cells[coordinate]
+        return Context(cells)
 
     def dump(self, filename: str):
         with open(filename, 'w', encoding="utf8") as file:
@@ -86,7 +86,7 @@ class Cell(object):
     def as_char(self):
         return '@'
 
-    def update(self, Context):
+    def update(self, context):
         ...
 
 
@@ -102,11 +102,12 @@ class Context(object):
 
 def main():
     my_world = World(10)
-    print(my_world)
     try:
         my_world.dump("test.txt")
         loaded = World.load("test.txt")
-        print()
+        context = my_world.get_context(1, 1)
+        for c in context.cells:
+            print(c)
     except TooBigError as tbe:
         print("Index out of range!")
 
