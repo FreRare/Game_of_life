@@ -106,8 +106,8 @@ def main():
         my_world.dump("test.txt")
         loaded = World.load("test.txt")
         context = my_world.get_context(1, 1)
-        for c in context.cells:
-            print(c)
+        for (x, y), c in context.cells.items():
+            print(f"Cell at ({x}, {y}) is {c.state}")
     except TooBigError as tbe:
         print("Index out of range!")
 
