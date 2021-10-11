@@ -1,92 +1,114 @@
-import statistics
-import functools
-import time
+from typing import Tuple, List, Optional, Dict
 
 
-def rs(function):
-    @functools.wraps(function)
-    def wrapper_runtime_stopper(*args, **kwargs):
-        start_time = time.perf_counter()
-        ret_value = function(*args, **kwargs)
-        stop_time = time.perf_counter()
-        elapsed_time = stop_time - start_time
-        print(f"The {function} function's runtime was: {elapsed_time:0.4f} seconds.")
-        return ret_value
-    return wrapper_runtime_stopper
+class TooBigError(Exception):
+    ...
 
 
-class Playlist(object):
-    def __init__(self, length: int = 0, musics: list = None):
-        if isinstance(length, int):
-            self.length = length
-        if isinstance(musics, list) and isinstance(musics[0], dict):
-            self.musics = musics
-        else:
-            self.musics = None
+class World(object):
+    def __init__(self, size):
+        self.cells: Dict[Tuple[int, int], Cell] = {
+            (0, 0): Cell(),
+            (0, 1): Cell(),
+            (3, 0): Cell()
+        }
+        self.size = size
 
-    @rs
-    def read_in_musics(self, filename: str):
-        if not isinstance(filename, str):
-            print("Invalid filename!")
-            return
-        if self.musics is None:
-            self.musics = []
-        with open(filename, "r") as f:
-            row = f.readline()
-            while row:
-                track = row.split(";")
-                music = dict()
-                music["artist"] = str(track[0])
-                music["title"] = str(track[1])
-                music["style"] = str(track[2])
-                music["length"] = int(track[3])
-                self.musics.append(music)
-                row = f.readline()
+    def get_context(self, x: int, y: int):
+        cells = {}
+        coordinates = [
+            (x + 1, y + 1),
+            (x - 1, y + 1),
+            (x + 1, y - 1),
+            (x - 1, y - 1),
 
-    def total_length(self):
-        for track in self.musics:
-            self.length += track.get("length")
-        minute = self.length // 60
-        second = self.length % 60
-        with open("total_length.txt", "w") as h:
-            h.write(f"The total length of the playlist is: {minute} minute(s), {second} second(s)\n")
+            (x + 0, y - 1),
+            (x + 1, y + 0),
+            (x + 0, y + 1),
+            (x - 1, y + 0),
+        ]
+        for coordinate in coordinates:
+            if coordinate in self.cells:
+                cells[coordinate] = self.cells[coordinate]
+        return Context(cells)
 
-    @rs
-    def longest_rock(self):
+    def __str__(self):
+        cell_list: List[List[Optional[Cell]]] = []
+        for x in range(self.size):
+            row = []
+            for y in range(self.size):
+                row.append(self.cells.get((x, y), None))
+            cell_list.append(row)
 
-        longest = next((track for track in self.musics if track["length"] == max((map(lambda track: track["length"] if track["style"] == "rock" else 0, self.musics))) and track["style"] == "rock"), None)
-        if longest is None:
-            raise ValueError()
-        with open("longest_rock.txt", "w") as lr:
-            lr.write(longest["title"] + "\n")
+        text = ""
+        for row in cell_list:
+            for col in row:
+                if col is not None:
+                    text += col.as_char()
+                else:
+                    text += "."
+            text += "\n"
+        return text
 
-    @rs
-    def favourite_style(self):
-        style = statistics.mode(map(lambda track: track["style"], self.musics))
-        with open("fav.txt", "w") as fav:
-            fav.write(style + "\n")
+    def dump(self, filename: str):
+        with open(filename, 'w', encoding="utf8") as file:
+            for (x, y), cell in self.cells.items():
+                if x > self.size or y > self.size:
+                    raise TooBigError()
+                file.write(f"{type(cell).__name__},{x},{y}\n")
 
-    @rs
-    def list_by_artist(self, artist: str):
-        if not isinstance(artist, str):
-            print(f"Error! Invalid artist name: {artist}")
-            return
-        if next((track for track in self.musics if track["artist"].lower() == artist.lower()), None) is None:
-            print(f"Artist not found! ({artist})")
-            return
-        with open(artist.lower().replace(" ", "_") + "_songs.txt", "w") as lbs:
-            for track in self.musics:
-                if track["artist"].lower() == artist.lower():
-                    lbs.write(";".join(str(t) for t in track.values()) + "\n")
+    @staticmethod
+    def load(filename):
+        w = World(10)
+        with open(filename, "r", encoding="utf-8") as f:
+            for row in f:
+                row.strip()
+                raw_cell, x, y = row.split(",")
+                x = int(x)
+                y = int(y)
+                for cell_class in registry:
+                    if cell_class.__name__ == raw_cell:
+                        cell = cell_class()
+                        break
+                if cell is not None:
+                    w.cells[(x, y)] = cell
+                print(row)
+        return w
+
+
+class Cell(object):
+    def __init__(self):
+        self.state = "alive"
+
+    def __str__(self):
+        return f"the cell is {self.state}"
+
+    def as_char(self):
+        return '@'
+
+    def update(self, Context):
+        ...
+
+
+registry = [Cell]
+
+
+class Context(object):
+    def __init__(self, cells: Dict[Tuple[int, int], Cell]):
+        if len(cells) > 8:
+            raise TooBigError("Context init receives only 8-neighbours!")
+        self.cells: Dict[Tuple[int, int], Cell] = cells
 
 
 def main():
-    playlist1 = Playlist()
-    playlist1.read_in_musics("playlist.csv")
-    playlist1.total_length()
-    playlist1.longest_rock()
-    playlist1.favourite_style()
-    playlist1.list_by_artist("powerwolf")
+    my_world = World(10)
+    print(my_world)
+    try:
+        my_world.dump("test.txt")
+        loaded = World.load("test.txt")
+        print()
+    except TooBigError as tbe:
+        print("Index out of range!")
 
 
 if __name__ == "__main__":
