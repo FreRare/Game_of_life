@@ -1,17 +1,60 @@
+# !usr/bin/python
 from typing import Tuple, List, Dict
 import time
+import gc
 
 
+# error class for oversize arguments
 class TooBigError(Exception):
     ...
 
 
+class Cell(object):
+    def __init__(self, state: bool = False):
+        self.state = state
+
+    def __str__(self):
+        return f"The cell is {self.state}"
+
+    def as_char(self):
+        if self.state:
+            return "@"
+        else:
+            return "."
+
+    # Gives back a value of true if the cell stays alive, false if not
+    # Each cell with one or no neighbors dies, as if by solitude.
+    # Each cell with four or more neighbors dies, as if by overpopulation.
+    # Each cell with two or three neighbors survives.
+    # Each cell with three neighbors becomes populated.
+    def update(self, context):
+        if not isinstance(context, Context):
+            raise TypeError("Context type does not match!")
+        if len(context.cells) < 2 or len(context.cells) > 3:
+            return False
+        elif len(context.cells) == 3:
+            return True
+        else:
+            return self.state
+
+
 class World(object):
     def __init__(self, size, which_is_alive: List[Tuple[int, int]] = None):
-        if which_is_alive is None:
-            which_is_alive = [(11, 12), (12, 12), (15, 12), (13, 11), (14, 11), (13, 13), (14, 13)]
+        if which_is_alive is None:      # Optional, you can give which cells should be alive in the start
+            which_is_alive = [          # Rewrite these, to make a different base pattern
+                (11, 12),
+                (12, 12),
+                (15, 12),
+                (13, 11),
+                (14, 11),
+                (13, 13),
+                (14, 13)
+            ]
         self.cells: Dict[Tuple[int, int], Cell] = {}
         self.size = size
+        for (x, y) in which_is_alive:
+            if x > self.size or y > self.size:
+                raise TooBigError(f"Coordinates are over indexed! ({which_is_alive}) size = {self.size}!")
         for x in range(size):
             for y in range(size):
                 if (x, y) in which_is_alive:
@@ -19,14 +62,10 @@ class World(object):
                 else:
                     self.cells[(x, y)] = Cell()
 
-    def cell_list_maker(self):
-        cell_list: List[List[Cell]] = []
-        for x in range(self.size):
-            row = []
-            for y in range(self.size):
-                row.append(self.cells[(x, y)])
-            cell_list.append(row)
-        return cell_list
+    # Creates a list from the world's dictionary
+    # Use for self.__str__
+    def cell_list_maker(self) -> List[List[Cell]]:
+        return list(list(self.cells[x, y] for y in range(self.size)) for x in range(self.size))
 
     def __str__(self):
         text = ""
@@ -36,6 +75,7 @@ class World(object):
             text += "\n"
         return text
 
+    # Returns a context object, 8-neighbours of the given cell
     def get_context(self, x: int, y: int):
         cells = {}
         coordinates = [
@@ -54,12 +94,15 @@ class World(object):
                 cells[coordinate] = self.cells[coordinate]
         return Context(cells)
 
-    def dump(self, filename: str):
+    def dump(self, filename: str, text: bool = False):
         with open(filename, 'w', encoding="utf8") as file:
             for (x, y), cell in self.cells.items():
                 if x > self.size or y > self.size:
                     raise TooBigError()
-                file.write(f"{type(cell).__name__},{x},{y},{cell.state}\n")
+                if not text:
+                    file.write(f"{type(cell).__name__},{x},{y},{cell.state}\n")
+                else:
+                    file.write(self.__str__())
 
     @staticmethod
     def load(filename: str):
@@ -67,59 +110,28 @@ class World(object):
         with open(filename, "r", encoding="utf-8") as f:
             for row in f:
                 row.strip()
-                raw_cell, x, y = row.split(",")
+                raw_cell, x, y, cell_state = row.split(",")
                 x = int(x)
                 y = int(y)
                 for cell_class in registry:
                     if cell_class.__name__ == raw_cell:
-                        cell = cell_class()
+                        cell = cell_class(cell_state)
                         break
                 if cell is not None:
                     w.cells[(x, y)] = cell
-                print(row)
         return w
 
+    # Returns TURE if the simulation is over
+    # Checks the whole world, and updates the cells in it
+    # Generates a new world object to avoid overwriting updated cells
+    # If the alive cells in the two world does match the simulation is over
     def update_world(self):
-        alive_at_new = []
-        for (x, y), c in self.cells.items():
-            if c.update(self.get_context(x, y)):
-                alive_at_new.append((x, y))
-        new_world = World(self.size, alive_at_new)
-        for (x, y), c in self.cells.items():
-            for (nx, ny), nc in new_world.cells.items():
-                if (x, y) == (nx, ny) and c.state != nc.state:
-                    self.cells = new_world.cells
-                    return False
-        return True
-    
-
-class Cell(object):
-    def __init__(self, state: bool = False):
-        self.state = state
-
-    def __str__(self):
-        return f"the cell is {self.state}"
-
-    def as_char(self):
-        if self.state:
-            return "@"
-        else:
-            return "."
-
-    # updates the cell
-    # Each cell with one or no neighbors dies, as if by solitude.
-    # Each cell with four or more neighbors dies, as if by overpopulation.
-    # Each cell with two or three neighbors survives.
-    # Each cell with three neighbors becomes populated.
-    def update(self, context):
-        if not isinstance(context, Context):
-            raise TypeError("Context type does not match!")
-        if len(context.cells) < 2 or len(context.cells) > 3:
-            return False
-        elif len(context.cells) == 3:
+        alive_at_new = list((x, y) for (x, y), c in self.cells.items() if c.update(self.get_context(x, y)))
+        alive_at_now = list((x, y) for (x, y), c in self.cells.items() if c.state)
+        if alive_at_now == alive_at_new:
             return True
-        else:
-            return self.state
+        self.cells = World(self.size, alive_at_new).cells
+        return False
 
 
 class Context(object):
@@ -129,34 +141,35 @@ class Context(object):
         self.cells: Dict[Tuple[int, int], Cell] = cells
 
 
+# Stores the type of objets stored in the world
 registry = [Cell]
 
 
 def main():
-    print("Hey there, this is the game of life!")
-    print("You can give the size of the world.")
-    world_size = int(input("Please give the size of the world (2-50):"))
-    my_world = World(world_size)
     try:
+        print("Hey there, this is the game of life!")
+        world_size = int(input("Please give the size of the world (recommended min 20):"))
+        my_world = World(world_size)
+        print(my_world)
+        input("Press Enter to start...")
         my_world.dump("in_the_beginning.txt")
         i = 0
-        finished = False
         while True:
             print(my_world, end="\r")
-            finished = my_world.update_world()
-            time.sleep(0.1)
-            if i == 100 or finished:
+            if i == 100 or my_world.update_world():
                 break
             i += 1
+            time.sleep(0.1)
         my_world.dump("in_the_end.txt")
     except TooBigError as tbe:
-        print("Index out of range!")
+        print(tbe)
     except TypeError as te:
         print(te.args)
     except Exception as e:
         print(e)
     finally:
         print("Thank you for playing with me...")
+        gc.collect()
 
 
 if __name__ == "__main__":
