@@ -1,4 +1,5 @@
 from typing import Tuple, List, Dict
+import time
 
 
 class TooBigError(Exception):
@@ -29,19 +30,10 @@ class World(object):
 
     def __str__(self):
         text = ""
-        rindex = 0
         for row in self.cell_list_maker():
-            if rindex < 10:
-                text += f"|{rindex} |"
-            else:
-                text += f"|{rindex}|"
             for col in row:
                 text += col.as_char()
-            if rindex < 10:
-                text += f"|{rindex} |\n"
-            else:
-                text += f"|{rindex}|\n"
-            rindex += 1
+            text += "\n"
         return text
 
     def get_context(self, x: int, y: int):
@@ -93,8 +85,13 @@ class World(object):
             if c.update(self.get_context(x, y)):
                 alive_at_new.append((x, y))
         new_world = World(self.size, alive_at_new)
-        self.cells = new_world.cells
-
+        for (x, y), c in self.cells.items():
+            for (nx, ny), nc in new_world.cells.items():
+                if (x, y) == (nx, ny) and c.state != nc.state:
+                    self.cells = new_world.cells
+                    return False
+        return True
+    
 
 class Cell(object):
     def __init__(self, state: bool = False):
@@ -137,15 +134,20 @@ registry = [Cell]
 
 def main():
     print("Hey there, this is the game of life!")
-    print("You can give the size of the table and which cells should be alive in the beginning.")
+    print("You can give the size of the world.")
     world_size = int(input("Please give the size of the world (2-50):"))
     my_world = World(world_size)
-    simulation_length = int(input("Please give how many steps should the simulation take:"))
     try:
-        for i in range(simulation_length):
-            print(f"{i}. simulation:")
-            print(my_world)
-            my_world.update_world()
+        my_world.dump("in_the_beginning.txt")
+        i = 0
+        finished = False
+        while True:
+            print(my_world, end="\r")
+            finished = my_world.update_world()
+            time.sleep(0.1)
+            if i == 100 or finished:
+                break
+            i += 1
         my_world.dump("in_the_end.txt")
     except TooBigError as tbe:
         print("Index out of range!")
