@@ -155,8 +155,8 @@ def main():
         my_world.dump("in_the_beginning.txt")
         i = 0
         while True:
-            print(my_world, end="\r")
-            if i == 100 or my_world.update_world():
+            print(my_world, end="\r")				# Changes the world until it is final (no more updateable cell)
+            if i == 100 or my_world.update_world():		# Or the simulation reaches number 100 (if infinite than may be helpful)
                 break
             i += 1
             time.sleep(0.1)
