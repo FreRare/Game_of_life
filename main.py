@@ -3,8 +3,8 @@ from typing import Tuple, List, Dict
 import time
 import gc
 
-define MAX_LENGTH 100
-define ALIVE_AT_START [          # Rewrite these, to make a different base pattern
+MAX_LENGTH = 100
+ALIVE_AT_START = [          # Rewrite these, to make a different base pattern
                 (11, 12),
                 (12, 12),
                 (15, 12),
