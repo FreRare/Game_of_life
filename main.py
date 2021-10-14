@@ -3,6 +3,16 @@ from typing import Tuple, List, Dict
 import time
 import gc
 
+define MAX_LENGTH 100
+define ALIVE_AT_START [          # Rewrite these, to make a different base pattern
+                (11, 12),
+                (12, 12),
+                (15, 12),
+                (13, 11),
+                (14, 11),
+                (13, 13),
+                (14, 13)
+            ]
 
 # error class for oversize arguments
 class TooBigError(Exception):
@@ -41,15 +51,7 @@ class Cell(object):
 class World(object):
     def __init__(self, size, which_is_alive: List[Tuple[int, int]] = None):
         if which_is_alive is None:      # Optional, you can give which cells should be alive in the start
-            which_is_alive = [          # Rewrite these, to make a different base pattern
-                (11, 12),
-                (12, 12),
-                (15, 12),
-                (13, 11),
-                (14, 11),
-                (13, 13),
-                (14, 13)
-            ]
+            which_is_alive = ALIVE_AT_START
         self.cells: Dict[Tuple[int, int], Cell] = {}
         self.size = size
         for (x, y) in which_is_alive:
@@ -156,7 +158,7 @@ def main():
         i = 0
         while True:
             print(my_world, end="\r")				# Changes the world until it is final (no more updateable cell)
-            if i == 100 or my_world.update_world():		# Or the simulation reaches number 100 (if infinite than may be helpful)
+            if i == MAX_LENGTH or my_world.update_world():		# Or the simulation reaches max (if infinite than may be helpful)
                 break
             i += 1
             time.sleep(0.1)
